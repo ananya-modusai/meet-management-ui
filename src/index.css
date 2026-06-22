@@ -1,25 +1,85 @@
 @import "tailwindcss";
 
 @theme {
-  --color-background: #0f1115;
-  --color-foreground: #ffffff;
-  --color-card: #181b21;
-  --color-card-border: #262a33;
-  --color-accent: #3b82f6;
-  --color-accent-hover: #2563eb;
-  --color-muted: #8b949e;
+  --font-display: "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  --font-mono: "Spline Sans Mono", ui-monospace, monospace;
+
+  /* Surfaces */
+  --color-canvas: #f1f2f6; /* Platinum */
+  --color-surface: #ffffff;
+  --color-surface-2: #f7f8fb;
+  --color-border: #e4e6ef;
+  --color-border-strong: #d3d6e4;
+
+  /* Brand */
+  --color-indigo: #27187e; /* Indigo Ink */
+  --color-indigo-700: #2f2095;
+  --color-indigo-600: #3d2cb0;
+  --color-cornflower: #758bfd; /* Cornflower Blue */
+  --color-periwinkle: #aeb8fe; /* Periwinkle */
+  --color-periwinkle-soft: #e9ecff;
+  --color-orange: #ff8600; /* Princeton Orange */
+  --color-orange-600: #ed7a00;
+  --color-orange-soft: #fff2e2;
+
+  /* Ink */
+  --color-ink: #1b1733;
+  --color-ink-2: #595477;
+  --color-ink-3: #8c89a6;
+
+  /* Semantic (status) */
+  --color-success: #1f9d72;
+  --color-success-soft: #e3f6ee;
+  --color-danger: #e5484d;
+  --color-danger-soft: #fde7e8;
 }
 
 :root {
-  background-color: var(--color-background);
-  color: var(--color-foreground);
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  color-scheme: dark;
+  color-scheme: light;
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  padding: 0;
   min-height: 100vh;
-  -webkit-font-smoothing: antialiased;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+  }
 }

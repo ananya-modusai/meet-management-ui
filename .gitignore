@@ -27,3 +27,9 @@ dist-ssr
 .env
 .env.*
 other_resources/client_secret_*.json
+
+CONVERSATIONS.md 
+PLAN.md
+SKILL.md
+task.md
+other_resources/*
