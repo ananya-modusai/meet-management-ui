@@ -17,7 +17,7 @@ export function Account({ user, onSignOut }: Props) {
     <div className="max-w-2xl space-y-6">
       <section className="rounded-2xl border border-border bg-surface p-6">
         <div className="flex items-center gap-4">
-          <Avatar name={user?.name || user?.email || 'You'} size="md" className="!h-16 !w-16 !text-xl ring-canvas" />
+          <Avatar name={user?.name[0] || user?.email || 'You'} size="md" className="!h-16 !w-16 !text-xl ring-canvas" />
           <div className="min-w-0">
             <h2 className="truncate font-display text-xl font-extrabold">{user?.name || 'Signed in'}</h2>
             <p className="truncate text-ink-2">{user?.email}</p>

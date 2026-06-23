@@ -73,7 +73,7 @@ export function Shell({ user, active, onNavigate, onSignOut, onRefresh, loading,
         </nav>
 
         <div className="mt-4 flex items-center gap-3 rounded-xl bg-white/5 p-3">
-          <Avatar name={user?.name?.[0] ?? user?.email?.[0] ?? 'Y'} size="md" className="ring-indigo" />
+          <Avatar name={user?.name[0] || user?.email?.[0] || 'Y'} size="md" className="ring-indigo" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-white">{user?.name || 'none'}</p>
             <p className="truncate text-xs text-periwinkle/70">{user?.email}</p>
