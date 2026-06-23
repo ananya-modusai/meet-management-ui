@@ -128,10 +128,6 @@ export function Settings({ settings, onSave }: Props) {
             </button>
           ))}
         </div>
-        <p className="mt-3 rounded-lg bg-surface-2 px-3 py-2 text-xs text-ink-3">
-          Meet-Alert places up to <span className="font-semibold text-ink-2">2 calls at once</span>.
-          If many armed meetings start together, calls go out in order of start time.
-        </p>
       </Card>
 
       <div className="flex items-center justify-end gap-3">
