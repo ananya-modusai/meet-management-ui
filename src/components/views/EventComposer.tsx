@@ -17,6 +17,7 @@ interface Props {
   mode: 'create' | 'edit';
   initial: ComposerInitial;
   armed: boolean;
+  alertMode?: 'all' | 'manual';
   leadMinutes: number;
   onClose: () => void;
   onSubmit: (input: EventInput, arm: boolean) => Promise<void>;
@@ -32,7 +33,7 @@ const combine = (dateStr: string, timeStr: string) => {
   return new Date(y, m - 1, d, hh, mm);
 };
 
-export function EventComposer({ mode, initial, armed, leadMinutes, onClose, onSubmit, onDelete }: Props) {
+export function EventComposer({ mode, initial, armed, alertMode = 'manual', leadMinutes, onClose, onSubmit, onDelete }: Props) {
   const [summary, setSummary] = useState(initial.summary);
   const [date, setDate] = useState(toDateInput(initial.start));
   const [startT, setStartT] = useState(toTimeInput(initial.start));
@@ -129,9 +130,13 @@ export function EventComposer({ mode, initial, armed, leadMinutes, onClose, onSu
           <div className="flex items-center justify-between rounded-xl border border-border bg-surface-2 px-4 py-3">
             <div>
               <p className="text-sm font-semibold">Call me before this</p>
-              <p className="text-xs text-ink-3">Rings your phone {leadMinutes} min before it starts.</p>
+              <p className="text-xs text-ink-3">
+                {alertMode === 'all'
+                  ? (arm ? `Rings ${leadMinutes} min before it starts.` : 'Muted — no call for this meeting.')
+                  : `Rings your phone ${leadMinutes} min before it starts.`}
+              </p>
             </div>
-            <Toggle on={arm} onChange={() => setArm((v) => !v)} label="Arm a call for this meeting" />
+            <Toggle on={arm} onChange={() => setArm((v) => !v)} label="Call me before this meeting" />
           </div>
 
           {err && <p className="text-sm text-danger">{err}</p>}

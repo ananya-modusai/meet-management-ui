@@ -49,8 +49,8 @@ export function buildDays(events: CalendarEvent[], start: Date, count = 7): Week
   }
 
   // Sensible default window when the week is empty, clamped to working hours.
-  const startHour = Math.max(6, Math.min(minHour, 9));
-  const endHour = Math.min(22, Math.max(maxHour, 18));
+  const startHour = Math.max(0, Math.min(minHour, 9));
+  const endHour = Math.min(24, Math.max(maxHour, 18));
 
   return { days, startHour, endHour: Math.max(endHour, startHour + 1) };
 }

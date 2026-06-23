@@ -24,6 +24,8 @@ export interface LineSettings {
   message: string;
   /** How many minutes before a meeting the call goes out. */
   leadMinutes: number;
+  /** all = every meeting rings unless muted; manual = only explicitly armed meetings ring. */
+  alertMode: 'all' | 'manual';
 }
 
 export interface UserProfile {

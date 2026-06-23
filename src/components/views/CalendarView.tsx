@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { cn } from '../../lib/cn';
 import { useNow } from '../../lib/useNow';
 import { buildDays, type WeekLayout, type PositionedEvent } from '../../lib/calendar';
@@ -17,19 +17,22 @@ const hourFloat = (d: Date) => d.getHours() + d.getMinutes() / 60;
 interface Props {
   events: CalendarEvent[];
   armed: Set<string>;
+  muted: Set<string>;
   settings: LineSettings | null;
   onCreate: (input: EventInput) => Promise<CalendarEvent>;
   onUpdate: (id: string, input: EventInput) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onSetArm: (eventId: string, armed: boolean) => Promise<void>;
+  onSetMuted: (eventId: string, muted: boolean) => Promise<void>;
 }
 
 type Composer = { mode: 'create' | 'edit'; initial: ComposerInitial } | null;
 
-export function CalendarView({ events, armed, settings, onCreate, onUpdate, onDelete, onSetArm }: Props) {
+export function CalendarView({ events, armed, muted, settings, onCreate, onUpdate, onDelete, onSetArm, onSetMuted }: Props) {
   const now = useNow(60_000);
   const today = new Date(now);
   const lead = settings?.leadMinutes ?? 5;
+  const alertMode = settings?.alertMode ?? 'manual';
   const [mode, setMode] = useState<CalendarMode>('week');
   const [anchor, setAnchor] = useState<Date>(today);
   const [composer, setComposer] = useState<Composer>(null);
@@ -68,10 +71,18 @@ export function CalendarView({ events, armed, settings, onCreate, onUpdate, onDe
   const submit = async (input: EventInput, arm: boolean) => {
     if (composer?.mode === 'create') {
       const created = await onCreate(input);
-      await onSetArm(created.id, arm);
+      if (alertMode === 'all') {
+        if (!arm) await onSetMuted(created.id, true);
+      } else {
+        await onSetArm(created.id, arm);
+      }
     } else if (composer?.initial.id) {
       await onUpdate(composer.initial.id, input);
-      await onSetArm(composer.initial.id, arm);
+      if (alertMode === 'all') {
+        await onSetMuted(composer.initial.id, !arm);
+      } else {
+        await onSetArm(composer.initial.id, arm);
+      }
     }
     setComposer(null);
   };
@@ -125,6 +136,8 @@ export function CalendarView({ events, armed, settings, onCreate, onUpdate, onDe
             anchor={anchor}
             events={events}
             armed={armed}
+            muted={muted}
+            alertMode={alertMode}
             today={today}
             onEvent={openEdit}
             onDay={(d) => {
@@ -137,11 +150,16 @@ export function CalendarView({ events, armed, settings, onCreate, onUpdate, onDe
           <TimeGrid
             layout={buildDays(events, mode === 'week' ? startOfWeek(anchor) : anchor, mode === 'week' ? 7 : 1)}
             armed={armed}
+            muted={muted}
+            alertMode={alertMode}
             now={now}
             today={today}
             onEvent={openEdit}
             onSlot={openCreate}
-            onArm={(id) => onSetArm(id, !armed.has(id))}
+            onArm={(id) => {
+              if (alertMode === 'all') onSetMuted(id, !muted.has(id));
+              else onSetArm(id, !armed.has(id));
+            }}
           />
         )}
       </div>
@@ -150,7 +168,12 @@ export function CalendarView({ events, armed, settings, onCreate, onUpdate, onDe
         <EventComposer
           mode={composer.mode}
           initial={composer.initial}
-          armed={composer.initial.id ? armed.has(composer.initial.id) : false}
+          armed={
+            alertMode === 'all'
+              ? (composer.initial.id ? !muted.has(composer.initial.id) : true)
+              : (composer.initial.id ? armed.has(composer.initial.id) : false)
+          }
+          alertMode={alertMode}
           leadMinutes={lead}
           onClose={() => setComposer(null)}
           onSubmit={submit}
@@ -170,9 +193,16 @@ export function CalendarView({ events, armed, settings, onCreate, onUpdate, onDe
 
 /* ── Week / Day time grid ─────────────────────────────────────────────── */
 
+const GRID_START = 0;
+const GRID_END = 24;
+const HOURS = Array.from({ length: GRID_END - GRID_START }, (_, i) => GRID_START + i);
+const TOTAL_HEIGHT = HOURS.length * PX_PER_HOUR;
+
 function TimeGrid({
   layout,
   armed,
+  muted,
+  alertMode,
   now,
   today,
   onEvent,
@@ -181,21 +211,29 @@ function TimeGrid({
 }: {
   layout: WeekLayout;
   armed: Set<string>;
+  muted: Set<string>;
+  alertMode: 'all' | 'manual';
   now: number;
   today: Date;
   onEvent: (e: CalendarEvent) => void;
   onSlot: (start: Date) => void;
   onArm: (id: string) => void;
 }) {
-  const { days, startHour, endHour } = layout;
-  const hours = Array.from({ length: endHour - startHour }, (_, i) => startHour + i);
-  const gridHeight = hours.length * PX_PER_HOUR;
+  const { days } = layout;
   const nowHour = hourFloat(new Date(now));
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to 1 hour before current time on mount so "now" is in view with context above.
+  useEffect(() => {
+    if (!scrollRef.current) return;
+    scrollRef.current.scrollTop = Math.max(0, nowHour - 1) * PX_PER_HOUR;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="overflow-x-auto">
       <div className="min-w-[640px]">
-        {/* Day headers */}
+        {/* Sticky day headers */}
         <div className="flex border-b border-border" style={{ paddingLeft: 56 }}>
           {days.map(({ date }) => {
             const isToday = isSameDay(date, today);
@@ -215,49 +253,53 @@ function TimeGrid({
           })}
         </div>
 
-        {/* Body */}
-        <div className="flex">
-          {/* Time gutter */}
-          <div className="w-14 shrink-0" style={{ height: gridHeight }}>
-            {hours.map((h) => (
-              <div key={h} className="relative" style={{ height: PX_PER_HOUR }}>
-                <span className="absolute -top-2 right-2 font-mono text-[0.65rem] text-ink-3">
-                  {h % 12 === 0 ? 12 : h % 12}
-                  {h < 12 ? 'a' : 'p'}
-                </span>
-              </div>
-            ))}
-          </div>
+        {/* Scrollable body — fixed viewport height, full 24-hour grid inside */}
+        <div ref={scrollRef} className="overflow-y-auto" style={{ maxHeight: 'min(600px, calc(100vh - 14rem))' }}>
+          <div className="flex">
+            {/* Time gutter */}
+            <div className="w-14 shrink-0" style={{ height: TOTAL_HEIGHT }}>
+              {HOURS.map((h) => (
+                <div key={h} className="relative" style={{ height: PX_PER_HOUR }}>
+                  <span className="absolute -top-2 right-2 font-mono text-[0.65rem] text-ink-3">
+                    {h === 0 ? '12a' : h < 12 ? `${h}a` : h === 12 ? '12p' : `${h - 12}p`}
+                  </span>
+                </div>
+              ))}
+            </div>
 
-          {/* Day columns */}
-          {days.map(({ date, events }) => {
-            const isToday = isSameDay(date, today);
-            return (
-              <div key={date.toISOString()} className="relative flex-1 border-l border-border" style={{ height: gridHeight }}>
-                {hours.map((h) => (
-                  <button
-                    key={h}
-                    onClick={() => onSlot(new Date(date.getFullYear(), date.getMonth(), date.getDate(), h, 0))}
-                    className="block w-full border-t border-border transition-colors hover:bg-surface-2"
-                    style={{ height: PX_PER_HOUR }}
-                    aria-label="Add event"
-                  />
-                ))}
+            {/* Day columns */}
+            {days.map(({ date, events }) => {
+              const isToday = isSameDay(date, today);
+              return (
+                <div key={date.toISOString()} className="relative flex-1 border-l border-border" style={{ height: TOTAL_HEIGHT }}>
+                  {HOURS.map((h) => (
+                    <button
+                      key={h}
+                      onClick={() => onSlot(new Date(date.getFullYear(), date.getMonth(), date.getDate(), h, 0))}
+                      className="block w-full border-t border-border transition-colors hover:bg-surface-2"
+                      style={{ height: PX_PER_HOUR }}
+                      aria-label="Add event"
+                    />
+                  ))}
 
-                {events.map((pe) => (
-                  <EventBlock key={pe.event.id} pe={pe} startHour={startHour} armed={armed.has(pe.event.id)} onEvent={onEvent} onArm={onArm} />
-                ))}
+                  {events.map((pe) => {
+                    const isActive = alertMode === 'all' ? !muted.has(pe.event.id) : armed.has(pe.event.id);
+                    return (
+                      <EventBlock key={pe.event.id} pe={pe} startHour={GRID_START} active={isActive} alertMode={alertMode} onEvent={onEvent} onArm={onArm} />
+                    );
+                  })}
 
-                {isToday && nowHour >= startHour && nowHour <= endHour && (
-                  <div className="pointer-events-none absolute inset-x-0 z-20" style={{ top: (nowHour - startHour) * PX_PER_HOUR }}>
-                    <div className="relative h-px bg-orange">
-                      <span className="absolute -left-1 -top-1 h-2 w-2 rounded-full bg-orange" />
+                  {isToday && (
+                    <div className="pointer-events-none absolute inset-x-0 z-20" style={{ top: nowHour * PX_PER_HOUR }}>
+                      <div className="relative h-px bg-orange">
+                        <span className="absolute -left-1 -top-1 h-2 w-2 rounded-full bg-orange" />
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
@@ -267,13 +309,15 @@ function TimeGrid({
 function EventBlock({
   pe,
   startHour,
-  armed,
+  active,
+  alertMode,
   onEvent,
   onArm,
 }: {
   pe: PositionedEvent;
   startHour: number;
-  armed: boolean;
+  active: boolean;
+  alertMode: 'all' | 'manual';
   onEvent: (e: CalendarEvent) => void;
   onArm: (id: string) => void;
 }) {
@@ -282,13 +326,16 @@ function EventBlock({
   const height = Math.max((pe.end.getTime() - pe.start.getTime()) / 3_600_000 * PX_PER_HOUR - 3, 22);
   const widthPct = 100 / pe.lanes;
   const tall = height >= 56;
+  const short = height < 44;
+  const title = pe.event.summary || 'Untitled';
 
   return (
     <button
       onClick={() => onEvent(pe.event)}
       className={cn(
-        'absolute z-10 overflow-hidden rounded-lg px-2 py-1 text-left transition-shadow hover:shadow-md',
-        armed && 'ring-2 ring-orange ring-offset-1',
+        'absolute z-10 overflow-hidden rounded-lg text-left transition-shadow hover:shadow-md',
+        short ? 'px-2 py-0.5' : 'px-2 py-1',
+        active && 'ring-2 ring-orange ring-offset-1',
       )}
       style={{
         top,
@@ -306,21 +353,35 @@ function EventBlock({
           onArm(pe.event.id);
         }}
         role="button"
-        aria-label={armed ? 'Disarm call' : 'Arm a call'}
+        aria-label={
+          alertMode === 'all'
+            ? (active ? 'Mute call' : 'Unmute call')
+            : (active ? 'Disarm call' : 'Arm a call')
+        }
         className={cn(
           'absolute right-1 top-1 grid h-4 w-4 place-items-center rounded-full',
-          armed ? 'bg-orange text-white' : 'bg-white/70 text-ink-3 hover:text-orange',
+          active ? 'bg-orange text-white' : 'bg-white/70 text-ink-3 hover:text-orange',
         )}
       >
         <PhoneIcon width={9} height={9} />
       </span>
-      <p className="truncate pr-4 text-[0.7rem] font-mono opacity-80">{fmtTime(pe.start)}</p>
-      <p className="truncate pr-4 text-xs font-bold leading-tight">{pe.event.summary || 'Untitled'}</p>
-      {tall && pe.event.attendees?.length ? (
-        <div className="mt-1">
-          <AvatarStack attendees={pe.event.attendees} size="xs" max={4} />
-        </div>
-      ) : null}
+
+      {short ? (
+        // Single-line layout for short events — matches Google Calendar style
+        <p className="truncate pr-4 text-[0.7rem] font-semibold leading-none">
+          {title}, {fmtTime(pe.start)}
+        </p>
+      ) : (
+        <>
+          <p className="truncate pr-4 text-[0.7rem] font-mono opacity-80">{fmtTime(pe.start)}</p>
+          <p className="truncate pr-4 text-xs font-bold leading-tight">{title}</p>
+          {tall && pe.event.attendees?.length ? (
+            <div className="mt-1">
+              <AvatarStack attendees={pe.event.attendees} size="xs" max={4} />
+            </div>
+          ) : null}
+        </>
+      )}
     </button>
   );
 }
@@ -331,6 +392,8 @@ function MonthGrid({
   anchor,
   events,
   armed,
+  muted,
+  alertMode,
   today,
   onEvent,
   onDay,
@@ -339,6 +402,8 @@ function MonthGrid({
   anchor: Date;
   events: CalendarEvent[];
   armed: Set<string>;
+  muted: Set<string>;
+  alertMode: 'all' | 'manual';
   today: Date;
   onEvent: (e: CalendarEvent) => void;
   onDay: (d: Date) => void;
@@ -397,7 +462,9 @@ function MonthGrid({
                       className="flex w-full items-center gap-1 rounded px-1.5 py-0.5 text-left"
                       style={{ background: c.bg, color: c.text }}
                     >
-                      {armed.has(e.id) && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-orange" />}
+                      {(alertMode === 'all' ? !muted.has(e.id) : armed.has(e.id)) && (
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-orange" />
+                      )}
                       <span className="truncate text-[0.65rem] font-semibold">{e.summary || 'Untitled'}</span>
                     </button>
                   );

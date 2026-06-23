@@ -9,17 +9,22 @@ import { cn } from '../../lib/cn';
 interface Props {
   events: CalendarEvent[];
   armed: Set<string>;
+  muted: Set<string>;
   settings: LineSettings | null;
   logs: CallLog[];
   onNavigate: (v: ViewKey) => void;
 }
 
-export function Overview({ events, armed, settings, logs, onNavigate }: Props) {
+export function Overview({ events, armed, muted, settings, logs, onNavigate }: Props) {
   const now = useNow();
   const lead = settings?.leadMinutes ?? 5;
+  const alertMode = settings?.alertMode ?? 'manual';
 
   const armedUpcoming = events
-    .filter((e) => armed.has(e.id) && startOf(e).getTime() > now)
+    .filter((e) => {
+      if (startOf(e).getTime() <= now) return false;
+      return alertMode === 'all' ? !muted.has(e.id) : armed.has(e.id);
+    })
     .sort((a, b) => startOf(a).getTime() - startOf(b).getTime());
   const next = armedUpcoming[0];
   const weekAgo = now - 7 * 86_400_000;

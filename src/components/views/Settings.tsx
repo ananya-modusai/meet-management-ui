@@ -3,6 +3,11 @@ import { cn } from '../../lib/cn';
 import { PhoneIcon, BellIcon, ClockIcon } from '../icons';
 import type { LineSettings } from '../../types';
 
+const ALERT_MODES: { value: LineSettings['alertMode']; label: string; desc: string }[] = [
+  { value: 'all', label: 'All meetings', desc: 'Every meeting rings. Mute specific ones to skip.' },
+  { value: 'manual', label: 'Selected only', desc: 'Only meetings you arm will ring.' },
+];
+
 const MESSAGE_LIMIT = 220;
 const LEADS = [3, 5, 10, 15];
 
@@ -16,14 +21,18 @@ export function Settings({ settings, onSave }: Props) {
   const [phone, setPhone] = useState(settings.phone);
   const [message, setMessage] = useState(settings.message);
   const [lead, setLead] = useState(settings.leadMinutes);
+  const [alertMode, setAlertMode] = useState(settings.alertMode);
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
   const dirty =
-    phone !== settings.phone || message !== settings.message || lead !== settings.leadMinutes;
+    phone !== settings.phone ||
+    message !== settings.message ||
+    lead !== settings.leadMinutes ||
+    alertMode !== settings.alertMode;
 
   const save = async () => {
     setStatus('saving');
-    await onSave({ phone: phone.trim(), message: message.trim(), leadMinutes: lead });
+    await onSave({ phone: phone.trim(), message: message.trim(), leadMinutes: lead, alertMode });
     setStatus('saved');
     setTimeout(() => setStatus('idle'), 1600);
   };
@@ -56,6 +65,45 @@ export function Settings({ settings, onSave }: Props) {
         <p className="mt-2 text-right font-mono text-xs text-ink-3">
           {message.length}/{MESSAGE_LIMIT}
         </p>
+      </Card>
+
+      <Card
+        icon={<BellIcon width={18} height={18} />}
+        title="Alert mode"
+        desc="Choose which meetings trigger a call."
+      >
+        <div className="space-y-2">
+          {ALERT_MODES.map(({ value, label, desc }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setAlertMode(value)}
+              className={cn(
+                'flex w-full items-start gap-3 rounded-xl border px-4 py-3 text-left transition-colors',
+                alertMode === value
+                  ? 'border-orange bg-orange-soft'
+                  : 'border-border bg-surface hover:border-border-strong',
+              )}
+            >
+              <span
+                className={cn(
+                  'mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full border-2',
+                  alertMode === value ? 'border-orange' : 'border-border-strong',
+                )}
+              >
+                {alertMode === value && (
+                  <span className="h-2 w-2 rounded-full bg-orange" />
+                )}
+              </span>
+              <div>
+                <p className={cn('text-sm font-semibold', alertMode === value ? 'text-orange' : 'text-ink')}>
+                  {label}
+                </p>
+                <p className="text-xs text-ink-3">{desc}</p>
+              </div>
+            </button>
+          ))}
+        </div>
       </Card>
 
       <Card

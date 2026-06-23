@@ -108,6 +108,14 @@ lib/
 - **n8n workflow** — needs to be updated: replace Zenduty nodes with Vobiz HTTP request, point armed-check at the new backend `/alerts` endpoint, build dynamic `answer_url` that returns meeting-specific Voice XML
 - **`answer_url` endpoint** — needs to be a publicly accessible URL returning `<?xml ...><Response><Speak>...</Speak></Response>` with the meeting name/time interpolated
 
+### Recently landed
+- **Alert mode setting** — `alertMode: 'all' | 'manual'` added across the full stack:
+  - `types.ts` + `api.ts` (frontend), `store.js` + `keys.js` + `sync.js` + `api.js` (backend)
+  - `Settings.tsx` — new "Alert mode" card (radio-style selector)
+  - `CalendarView.tsx` + `EventComposer.tsx` — mode-aware toggles, labels, dot indicators
+  - New Redis key `ma:muted:{email}` (SET) + backend routes `GET /muted`, `PUT /muted/:eventId`
+  - Default: `manual` (no surprise calls for new users)
+
 ### Known issues / open questions
 - `Account.tsx` has an uncommitted change: `user?.name[0]` (first char) vs committed `user?.name` — need to confirm intended (Avatar probably wants initials, but `""`[0] is undefined so it falls through safely)
 - No `.env` in repo — Google Client ID must be in `VITE_GOOGLE_CLIENT_ID`; Vobiz credentials not in frontend (correct — they live in n8n)

@@ -26,6 +26,7 @@ const DEFAULT_SETTINGS: LineSettings = {
   message:
     "Heads up — your meeting starts in five minutes. Time to wrap up and head over.",
   leadMinutes: DEFAULT_LEAD_MINUTES,
+  alertMode: 'manual',
 };
 
 /** Token is threaded from App state — never stored separately in this module. */
@@ -40,7 +41,8 @@ export async function getSettings(email: string): Promise<LineSettings> {
   if (API_BASE) {
     const res = await fetch(`${API_BASE}/me`, { headers: authHeaders() });
     if (!res.ok) throw new Error('Could not load your settings.');
-    return res.json();
+    const data = await res.json();
+    return { ...DEFAULT_SETTINGS, ...data };
   }
   const raw = localStorage.getItem(key(email, 'settings'));
   return raw ? { ...DEFAULT_SETTINGS, ...JSON.parse(raw) } : DEFAULT_SETTINGS;
@@ -83,6 +85,35 @@ export async function setArmed(email: string, eventId: string, armed: boolean): 
   if (armed) ids.add(eventId);
   else ids.delete(eventId);
   localStorage.setItem(key(email, 'armed'), JSON.stringify([...ids]));
+}
+
+export async function getMutedIds(email: string): Promise<Set<string>> {
+  if (API_BASE) {
+    const res = await fetch(`${API_BASE}/muted`, { headers: authHeaders() });
+    // 404 = backend not yet deployed with muted support — treat as empty
+    if (res.status === 404) return new Set<string>();
+    if (!res.ok) throw new Error('Could not load your muted meetings.');
+    return new Set<string>(await res.json());
+  }
+  const raw = localStorage.getItem(key(email, 'muted'));
+  return new Set<string>(raw ? JSON.parse(raw) : []);
+}
+
+export async function setMuted(email: string, eventId: string, muted: boolean): Promise<void> {
+  if (API_BASE) {
+    const res = await fetch(`${API_BASE}/muted/${encodeURIComponent(eventId)}`, {
+      method: 'PUT',
+      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ muted }),
+    });
+    if (res.status === 404) return;
+    if (!res.ok) throw new Error('Could not save that change.');
+    return;
+  }
+  const ids = await getMutedIds(email);
+  if (muted) ids.add(eventId);
+  else ids.delete(eventId);
+  localStorage.setItem(key(email, 'muted'), JSON.stringify([...ids]));
 }
 
 export async function getCallLogs(email: string): Promise<CallLog[]> {
